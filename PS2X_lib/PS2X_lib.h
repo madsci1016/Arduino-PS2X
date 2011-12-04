@@ -1,5 +1,5 @@
 /******************************************************************
-*  Super amazing PS2 controller Arduino Library v1.6
+*  Super amazing PS2 controller Arduino Library v1.8
 *		details and example sketch: 
 *			http://www.billporter.info/?p=240
 *
@@ -52,6 +52,12 @@
 *		Changed config_gamepad() call to include rumble and pressures options
 *			This was to fix controllers that will only go into config mode once
 *			Old methods should still work for backwards compatibility 
+*    1.7
+*		Integrated Kurt's fixes for the interrupts messing with servo signals
+*		Reorganized directory so examples show up in Arduino IDE menu
+*    1.8
+*		Added Arduino 1.0 compatibility. 
+*
 *
 *
 *This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or(at your option) any later version.
@@ -73,8 +79,11 @@ GNU General Public License for more details.
 
 #ifndef PS2X_lib_h
 #define PS2X_lib_h
+#if ARDUINO > 22
+#include "Arduino.h"
+#else
 #include "WProgram.h"
-
+#endif
 
 #include <math.h>
 #include <stdio.h>

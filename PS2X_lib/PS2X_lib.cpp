@@ -3,8 +3,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <avr/io.h>
+#if ARDUINO > 22
+#include "Arduino.h"
+#else
 #include "WProgram.h"
 #include "pins_arduino.h"
+#endif
 
 
 

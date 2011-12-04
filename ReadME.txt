@@ -1,5 +1,5 @@
 /******************************************************************
-*  Super amazing PS2 controller Arduino Library v1.7
+*  Super amazing PS2 controller Arduino Library v1.8
 *		details and example sketch: 
 *			http://www.billporter.info/?p=240
 *
@@ -55,7 +55,8 @@
 *    1.7
 *	Integrated Kurt's fixes for the interrupts messing with servo signals
 *	Reorganized directory so examples show up in Arduino IDE menu
-*
+*    1.8
+*	Added Arduino 1.0 compatibility. 
 *
 *
 *This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or(at your option) any later version.
