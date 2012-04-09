@@ -48,26 +48,24 @@ byte PS2X::Analog(byte button) {
   return PS2data[button];
 }
 unsigned char PS2X::_gamepad_shiftinout (char byte) {
-   uint8_t old_sreg = SREG;        // *** KJE *** save away the current state of interrupts
   
 
    unsigned char tmp = 0;
-   cli();                          // *** KJE *** disable for now
    for(i=0;i<8;i++) {
 
-	  if(CHK(byte,i)) SET(*_cmd_oreg,_cmd_mask);
-	  else  CLR(*_cmd_oreg,_cmd_mask);
-	  CLR(*_clk_oreg,_clk_mask);
+	  if(CHK(byte,i)) CMD_SET();
+	  else  CMD_CLR();
+	  CLK_CLR();
 
-      SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
 	  delayMicroseconds(CTRL_CLK);
-	  cli();	// *** KJE ***
 
-	  if(CHK(*_dat_ireg,_dat_mask)) SET(tmp,i);
-	  SET(*_clk_oreg,_clk_mask);
+	  if(DAT_CHK()) SET(tmp,i);
+	  CLK_SET();
+#if CTRL_CLK_HIGH
+	  delayMicroseconds(CTRL_CLK_HIGH);
+#endif	  
    }
-   SET(*_cmd_oreg,_cmd_mask);
-   SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+   CMD_SET();
    delayMicroseconds(CTRL_BYTE_DELAY);
    return tmp;
 }
@@ -77,9 +75,8 @@ void PS2X::read_gamepad() {
 }
 
 
-void PS2X::read_gamepad(boolean motor1, byte motor2) {
+boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
   double temp = millis() - last_read;
-  uint8_t old_sreg = SREG;        // *** KJE **** save away the current state of interrupts - *** *** KJE *** ***
   
   if (temp > 1500) //waited to long
     reconfig_gamepad();
@@ -88,34 +85,49 @@ void PS2X::read_gamepad(boolean motor1, byte motor2) {
     delay(read_delay - temp);
     
     
-  last_buttons = buttons; //store the previous buttons states
 
   if(motor2 != 0x00)
     motor2 = map(motor2,0,255,0x40,0xFF); //noting below 40 will make it spin
   
-  cli();	//*** KJE ***  
-  SET(*_cmd_oreg,_cmd_mask);
-  SET(*_clk_oreg,_clk_mask);
-  CLR(*_att_oreg,_att_mask); // low enable joystick
-  SREG = old_sreg;  // *** KJE *** - Interrupts may be enabled again
-  
-  delayMicroseconds(CTRL_BYTE_DELAY);
-  //Send the command to send button and joystick data;
-  char dword[9] = {0x01,0x42,0,motor1,motor2,0,0,0,0};
-  byte dword2[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+  // Try a few times to get valid data...
+  for (byte RetryCnt = 0; RetryCnt < 5; RetryCnt++) {
+  	  CMD_SET();
+      CLK_SET();
+      ATT_CLR(); // low enable joystick
+	  
+	  delayMicroseconds(CTRL_BYTE_DELAY);
+	  //Send the command to send button and joystick data;
+	  char dword[9] = {0x01,0x42,0,motor1,motor2,0,0,0,0};
+	  byte dword2[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
-  for (int i = 0; i<9; i++) {
-	  PS2data[i] = _gamepad_shiftinout(dword[i]);
+	  for (int i = 0; i<9; i++) {
+		  PS2data[i] = _gamepad_shiftinout(dword[i]);
+	  }
+
+
+	  if(PS2data[1] == 0x79) {  //if controller is in full data return mode, get the rest of data
+		   for (int i = 0; i<12; i++) {
+				PS2data[i+9] = _gamepad_shiftinout(dword2[i]);
+		   }
+	  }
+		
+  	  ATT_SET(); // HI disable joystick
+	  // Check to see if we received valid data or not.  We should be in analog mode for our data
+	  // to be valie
+	  if ((PS2data[1] & 0xf0) == 0x70)
+ 		break;
+	
+	// If we got to here, we are not in analog mode, try to recover...
+	reconfig_gamepad();	// try to get back into Analog mode.
+	delay(read_delay);
   }
-  if(PS2data[1] == 0x79) {  //if controller is in full data return mode, get the rest of data
-       for (int i = 0; i<12; i++) {
-			PS2data[i+9] = _gamepad_shiftinout(dword2[i]);
-       }
-  }
-    
-  cli();
-  SET(*_att_oreg,_att_mask); // HI disable joystick
-  SREG = old_sreg;  // Interrupts may be enabled again    
+  
+  // If we get here and still not in analog mode, try increasing the read_delay...
+  if ((PS2data[1] & 0xf0) != 0x70) {
+	if (read_delay < 10)
+		read_delay++;	// see if this helps out...
+  }	
+
 	
 	#ifdef PS2X_COM_DEBUG
     Serial.println("OUT:IN");
@@ -134,8 +146,15 @@ void PS2X::read_gamepad(boolean motor1, byte motor2) {
 	Serial.println("");	
 	#endif
 	
+  last_buttons = buttons; //store the previous buttons states
+
+#if defined(__AVR__)
    buttons = *(uint16_t*)(PS2data+3);   //store as one value for multiple functions
+#else
+   buttons =  (uint16_t)(PS2data[4] << 8) + PS2data[3];   //store as one value for multiple functions
+#endif
    last_read = millis();
+   return ((PS2data[1] & 0xf0) == 0x70);
 }
 
 byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat) {
@@ -145,30 +164,51 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat) {
 
 byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bool pressures, bool rumble) {
 
-   uint8_t old_sreg = SREG;        // *** KJE *** save away the current state of interrupts
    byte temp[sizeof(type_read)];
   
- _clk_mask = maskToBitNum(digitalPinToBitMask(clk));
+#ifdef __AVR__
+ _clk_mask = digitalPinToBitMask(clk);
  _clk_oreg = portOutputRegister(digitalPinToPort(clk));
- _cmd_mask = maskToBitNum(digitalPinToBitMask(cmd));
+ _cmd_mask = digitalPinToBitMask(cmd);
  _cmd_oreg = portOutputRegister(digitalPinToPort(cmd));
- _att_mask = maskToBitNum(digitalPinToBitMask(att));
+ _att_mask = digitalPinToBitMask(att);
  _att_oreg = portOutputRegister(digitalPinToPort(att));
- _dat_mask = maskToBitNum(digitalPinToBitMask(dat));
+ _dat_mask = digitalPinToBitMask(dat);
  _dat_ireg = portInputRegister(digitalPinToPort(dat));
+#else
+
+	uint32_t            lport;                   // Port number for this pin
+	_clk_mask = digitalPinToBitMask(clk); 
+	lport = digitalPinToPort(clk);
+	_clk_lport_set = portOutputRegister(lport) + 2;
+	_clk_lport_clr = portOutputRegister(lport) + 1;
+
+	_cmd_mask = digitalPinToBitMask(cmd); 
+	lport = digitalPinToPort(cmd);
+	_cmd_lport_set = portOutputRegister(lport) + 2;
+	_cmd_lport_clr = portOutputRegister(lport) + 1;
+
+	_att_mask = digitalPinToBitMask(att); 
+	lport = digitalPinToPort(att);
+	_att_lport_set = portOutputRegister(lport) + 2;
+	_att_lport_clr = portOutputRegister(lport) + 1;
   
+	_dat_mask = digitalPinToBitMask(dat); 
+	_dat_lport = portInputRegister(digitalPinToPort(dat));
+
+#endif  
 
   pinMode(clk, OUTPUT); //configure ports
   pinMode(att, OUTPUT);
   pinMode(cmd, OUTPUT);
   pinMode(dat, INPUT);
 
+#if defined(__AVR__)
   digitalWrite(dat, HIGH); //enable pull-up 
+#endif
     
-   cli();                          // *** KJE *** disable for now
-   SET(*_cmd_oreg,_cmd_mask); // SET(*_cmd_oreg,_cmd_mask);
-   SET(*_clk_oreg,_clk_mask);
-   SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+   CMD_SET(); // SET(*_cmd_oreg,_cmd_mask);
+   CLK_SET();
    
    //new error checking. First, read gamepad a few times to see if it's talking
    read_gamepad();
@@ -195,11 +235,9 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
    //read type
    	delayMicroseconds(CTRL_BYTE_DELAY);
 
-    cli();                          // *** KJE *** disable for now
-	SET(*_cmd_oreg,_cmd_mask);
-    SET(*_clk_oreg,_clk_mask);
-    CLR(*_att_oreg,_att_mask); // low enable joystick
-    SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+	CMD_SET();
+    CLK_SET();
+    ATT_CLR(); // low enable joystick
 	
     delayMicroseconds(CTRL_BYTE_DELAY);
 
@@ -207,9 +245,7 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
 	  temp[i] = _gamepad_shiftinout(type_read[i]);
     }
 
-    cli();                          // *** KJE *** disable for now
-	SET(*_att_oreg,_att_mask); // HI disable joystick
-    SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+	ATT_SET(); // HI disable joystick
 	
 	controller_type = temp[3];
    
@@ -249,20 +285,16 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
 
 void PS2X::sendCommandString(byte string[], byte len) {
   
-   uint8_t old_sreg = SREG;        // *** KJE *** save away the current state of interrupts
 
   #ifdef PS2X_COM_DEBUG
   byte temp[len];
-  cli();                          // *** KJE *** disable for now
-  CLR(*_att_oreg,_att_mask); // low enable joystick
-  SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+  ATT_CLR(); // low enable joystick
+  delayMicroseconds(CTRL_BYTE_DELAY);
 	
   for (int y=0; y < len; y++)
     temp[y] = _gamepad_shiftinout(string[y]);
     
-  cli();                          // *** KJE *** disable for now
-  SET(*_att_oreg,_att_mask); //high disable joystick  
-  SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+  ATT_SET(); //high disable joystick  
    delay(read_delay);                  //wait a few
   
   Serial.println("OUT:IN Configure");
@@ -275,29 +307,16 @@ void PS2X::sendCommandString(byte string[], byte len) {
    Serial.println("");
   
   #else
-  cli();                          // *** KJE *** disable for now
-  CLR(*_att_oreg,_att_mask); // low enable joystick
-  SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+  ATT_CLR(); // low enable joystick
   for (int y=0; y < len; y++)
     _gamepad_shiftinout(string[y]);
     
-   cli();                          // *** KJE *** disable for now
-   SET(*_att_oreg,_att_mask); //high disable joystick  
-   SREG = old_sreg;  // *** *** KJE *** *** Interrupts may be enabled again 
+   ATT_SET(); //high disable joystick  
    delay(read_delay);                  //wait a few
    #endif
 }
 
  
-uint8_t PS2X::maskToBitNum(uint8_t mask) {
-    for (int y = 0; y < 8; y++)
-    {
-      if(CHK(mask,y))
-        return y;
-    }
-    return 0;
-}
-
 
 byte PS2X::readType() {
 /*
@@ -307,9 +326,9 @@ byte PS2X::readType() {
 	
 	delayMicroseconds(CTRL_BYTE_DELAY);
 
-	SET(*_cmd_oreg,_cmd_mask);
-    SET(*_clk_oreg,_clk_mask);
-    CLR(*_att_oreg,_att_mask); // low enable joystick
+	CMD_SET();
+    CLK_SET();
+    ATT_CLR(); // low enable joystick
 	
     delayMicroseconds(CTRL_BYTE_DELAY);
 
@@ -372,3 +391,84 @@ void PS2X::reconfig_gamepad(){
    sendCommandString(exit_config, sizeof(exit_config));
    
 }
+
+
+#ifdef __AVR__
+inline void  PS2X::CLK_SET(void) {
+	
+   register uint8_t old_sreg = SREG;
+   cli();
+   *_clk_oreg |= _clk_mask;
+   SREG = old_sreg;
+}
+
+inline void  PS2X::CLK_CLR(void) {
+   register uint8_t old_sreg = SREG;
+   cli();
+   *_clk_oreg &= ~_clk_mask;
+   SREG = old_sreg;
+}
+
+inline void  PS2X::CMD_SET(void) {
+   register uint8_t old_sreg = SREG;
+   cli();
+   *_cmd_oreg |= _cmd_mask; // SET(*_cmd_oreg,_cmd_mask);
+   SREG = old_sreg;
+}
+
+inline void  PS2X::CMD_CLR(void) {
+   register uint8_t old_sreg = SREG;
+   cli();
+   *_cmd_oreg &= ~_cmd_mask; // SET(*_cmd_oreg,_cmd_mask);
+   SREG = old_sreg;
+}
+
+inline void  PS2X::ATT_SET(void) {
+   register uint8_t old_sreg = SREG;
+   cli();
+  *_att_oreg |= _att_mask ; 	
+   SREG = old_sreg;
+}
+
+inline void PS2X::ATT_CLR(void) {
+   register uint8_t old_sreg = SREG;
+   cli();
+  *_att_oreg &= ~_att_mask; 
+   SREG = old_sreg;
+}
+
+inline bool PS2X::DAT_CHK(void) {
+	return (*_dat_ireg & _dat_mask)? true : false;
+}
+
+#else
+// On pic32, use the set/clr registers to make them atomic...inline void  PS2X::CLK_SET(void) {
+	*_clk_lport_set |= _clk_mask;
+}
+
+inline void  PS2X::CLK_CLR(void) {
+	*_clk_lport_clr |= _clk_mask;
+}
+
+inline void  PS2X::CMD_SET(void) {
+	*_cmd_lport_set |= _cmd_mask;
+}
+
+inline void  PS2X::CMD_CLR(void) {
+	*_cmd_lport_clr |= _cmd_mask;
+}
+
+inline void  PS2X::ATT_SET(void) {
+	*_att_lport_set |= _att_mask;
+}
+
+inline void PS2X::ATT_CLR(void) {
+	*_att_lport_clr |= _att_mask;
+}
+
+inline bool PS2X::DAT_CHK(void) {
+	return (*_dat_lport & _dat_mask)? true : false;
+
+}
+
+#endif
