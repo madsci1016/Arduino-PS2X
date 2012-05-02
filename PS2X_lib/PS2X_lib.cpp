@@ -89,6 +89,9 @@ boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
   if(motor2 != 0x00)
     motor2 = map(motor2,0,255,0x40,0xFF); //noting below 40 will make it spin
   
+  char dword[9] = {0x01,0x42,0,motor1,motor2,0,0,0,0};
+  byte dword2[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+
   // Try a few times to get valid data...
   for (byte RetryCnt = 0; RetryCnt < 5; RetryCnt++) {
   	  CMD_SET();
@@ -97,8 +100,6 @@ boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
 	  
 	  delayMicroseconds(CTRL_BYTE_DELAY);
 	  //Send the command to send button and joystick data;
-	  char dword[9] = {0x01,0x42,0,motor1,motor2,0,0,0,0};
-	  byte dword2[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
 	  for (int i = 0; i<9; i++) {
 		  PS2data[i] = _gamepad_shiftinout(dword[i]);
