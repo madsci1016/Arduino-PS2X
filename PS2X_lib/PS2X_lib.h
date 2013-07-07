@@ -72,36 +72,34 @@ GNU General Public License for more details.
 *  
 ******************************************************************/
 
-
 // $$$$$$$$$$$$ DEBUG ENABLE SECTION $$$$$$$$$$$$$$$$
 // to debug ps2 controller, uncomment these two lines to print out debug to uart
-
 //#define PS2X_DEBUG
 //#define PS2X_COM_DEBUG
 
-
 #ifndef PS2X_lib_h
-#define PS2X_lib_h
+  #define PS2X_lib_h
+
 #if ARDUINO > 22
-#include "Arduino.h"
+  #include "Arduino.h"
 #else
-#include "WProgram.h"
+  #include "WProgram.h"
 #endif
 
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #ifdef __AVR__
-#include <avr/io.h>
-
-#define CTRL_CLK        4
-#define CTRL_BYTE_DELAY 3
+  // AVR
+  #include <avr/io.h>
+  #define CTRL_CLK        4
+  #define CTRL_BYTE_DELAY 3
 #else
-// Pic32...
-#include <pins_arduino.h>
-#define CTRL_CLK        5
-#define CTRL_CLK_HIGH   5
-#define CTRL_BYTE_DELAY 4
+  // Pic32...
+  #include <pins_arduino.h>
+  #define CTRL_CLK        5
+  #define CTRL_CLK_HIGH   5
+  #define CTRL_BYTE_DELAY 4
 #endif 
 
 //These are our button constants
@@ -127,14 +125,14 @@ GNU General Public License for more details.
 #define PSB_SQUARE      0x8000
 
 //Guitar  button constants
-#define GREEN_FRET		0x0200
-#define RED_FRET		0x2000
-#define YELLOW_FRET		0x1000
-#define BLUE_FRET		0x4000
-#define ORANGE_FRET		0x8000
-#define STAR_POWER		0x0100
 #define UP_STRUM		0x0010
 #define DOWN_STRUM		0x0040
+#define STAR_POWER		0x0100
+#define GREEN_FRET		0x0200
+#define YELLOW_FRET		0x1000
+#define RED_FRET		0x2000
+#define BLUE_FRET		0x4000
+#define ORANGE_FRET		0x8000
 #define WHAMMY_BAR		8
 
 //These are stick values
@@ -144,7 +142,7 @@ GNU General Public License for more details.
 #define PSS_LY 8
 
 //These are analog buttons
-#define PSAB_PAD_RIGHT   9
+#define PSAB_PAD_RIGHT    9
 #define PSAB_PAD_UP      11
 #define PSAB_PAD_DOWN    12
 #define PSAB_PAD_LEFT    10
@@ -161,77 +159,75 @@ GNU General Public License for more details.
 #define PSAB_CROSS       15
 #define PSAB_SQUARE      16
 
-
 #define SET(x,y) (x|=(1<<y))
 #define CLR(x,y) (x&=(~(1<<y)))
 #define CHK(x,y) (x & (1<<y))
 #define TOG(x,y) (x^=(1<<y))
 
-
-
 class PS2X {
-public:
-boolean Button(uint16_t);
-unsigned int ButtonDataByte();
-boolean NewButtonState();
-boolean NewButtonState(unsigned int);
-boolean ButtonPressed(unsigned int);
-boolean ButtonReleased(unsigned int);
-void read_gamepad();
-boolean  read_gamepad(boolean, byte);
-byte readType();
-byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t);
-byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool);
-void enableRumble();
-bool enablePressures();
-byte Analog(byte);
-void reconfig_gamepad();
-private:
+  public:
+    boolean Button(uint16_t);                //will be TRUE if button is being pressed
+    unsigned int ButtonDataByte();
+    boolean NewButtonState();
+    boolean NewButtonState(unsigned int);    //will be TRUE if button was JUST pressed OR released
+    boolean ButtonPressed(unsigned int);     //will be TRUE if button was JUST pressed
+    boolean ButtonReleased(unsigned int);    //will be TRUE if button was JUST released
+    void read_gamepad();
+    boolean  read_gamepad(boolean, byte);
+    byte readType();
+    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t);
+    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool);
+    void enableRumble();
+    bool enablePressures();
+    byte Analog(byte);
+    void reconfig_gamepad();
 
-inline void CLK_SET(void);
-inline void CLK_CLR(void);
-inline void CMD_SET(void);
-inline void CMD_CLR(void);
-inline void ATT_SET(void);
-inline void ATT_CLR(void);
-inline bool DAT_CHK(void);
-
-unsigned char _gamepad_shiftinout (char);
-unsigned char PS2data[21];
-void sendCommandString(byte*, byte);
-unsigned char i;
-unsigned int last_buttons;
-unsigned int buttons;
-#ifdef __AVR__
-uint8_t maskToBitNum(uint8_t);
-uint8_t _clk_mask; 
-volatile uint8_t *_clk_oreg;
-uint8_t _cmd_mask; 
-volatile uint8_t *_cmd_oreg;
-uint8_t _att_mask; 
-volatile uint8_t *_att_oreg;
-uint8_t _dat_mask; 
-volatile uint8_t *_dat_ireg;
-#else
-uint8_t maskToBitNum(uint8_t);
-uint16_t 				_clk_mask; 
-volatile uint32_t *		_clk_lport_set;
-volatile uint32_t *		_clk_lport_clr;
-uint16_t 				_cmd_mask; 
-volatile uint32_t *		_cmd_lport_set;
-volatile uint32_t *		_cmd_lport_clr;
-uint16_t 				_att_mask; 
-volatile uint32_t *		_att_lport_set;
-volatile uint32_t *		_att_lport_clr;
-uint16_t 				_dat_mask; 
-volatile uint32_t *		_dat_lport;
-#endif
-unsigned long last_read;
-byte read_delay;
-byte controller_type;
-boolean en_Rumble;
-boolean en_Pressures;
-
+  private:
+    inline void CLK_SET(void);
+    inline void CLK_CLR(void);
+    inline void CMD_SET(void);
+    inline void CMD_CLR(void);
+    inline void ATT_SET(void);
+    inline void ATT_CLR(void);
+    inline bool DAT_CHK(void);
+    
+    unsigned char _gamepad_shiftinout (char);
+    unsigned char PS2data[21];
+    void sendCommandString(byte*, byte);
+    unsigned char i;
+    unsigned int last_buttons;
+    unsigned int buttons;
+	
+    #ifdef __AVR__
+      uint8_t maskToBitNum(uint8_t);
+      uint8_t _clk_mask; 
+      volatile uint8_t *_clk_oreg;
+      uint8_t _cmd_mask; 
+      volatile uint8_t *_cmd_oreg;
+      uint8_t _att_mask; 
+      volatile uint8_t *_att_oreg;
+      uint8_t _dat_mask; 
+      volatile uint8_t *_dat_ireg;
+    #else
+      uint8_t maskToBitNum(uint8_t);
+      uint16_t _clk_mask; 
+      volatile uint32_t *_clk_lport_set;
+      volatile uint32_t *_clk_lport_clr;
+      uint16_t _cmd_mask; 
+      volatile uint32_t *_cmd_lport_set;
+      volatile uint32_t *_cmd_lport_clr;
+      uint16_t _att_mask; 
+      volatile uint32_t *_att_lport_set;
+      volatile uint32_t *_att_lport_clr;
+      uint16_t _dat_mask; 
+      volatile uint32_t *_dat_lport;
+    #endif
+	
+    unsigned long last_read;
+    byte read_delay;
+    byte controller_type;
+    boolean en_Rumble;
+    boolean en_Pressures;
 };
 
 #endif
