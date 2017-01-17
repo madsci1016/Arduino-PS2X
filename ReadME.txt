@@ -1,3 +1,14 @@
+2017-01-17		Update to examples.
+					Added an example for the Arduino Mega 2560 and the Lynxmotion PS2 v4 controller.
+					This example uses the following pins:
+					(PS2 receiver adaptor board) -> (Arduino Mega 2560)
+					GND -> GND
+					5V  -> 5V
+					CLK -> 22
+					CMD -> 23
+					ATT -> 24
+					DAT -> 25
+
 /******************************************************************
 *  Super amazing PS2 controller Arduino Library v1.8
 *		details and example sketch: 
