@@ -302,6 +302,7 @@ void PS2X::sendCommandString(byte string[], byte len) {
   Serial.println("");
 #else
   ATT_CLR(); // low enable joystick
+  delayMicroseconds(CTRL_BYTE_DELAY);
   for (int y=0; y < len; y++)
     _gamepad_shiftinout(string[y]);
   ATT_SET(); //high disable joystick
