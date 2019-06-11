@@ -95,12 +95,18 @@ GNU General Public License for more details.
   #define CTRL_CLK        4
   #define CTRL_BYTE_DELAY 3
 #else
+#ifdef ESP8266
+  #define CTRL_CLK        5
+  #define CTRL_CLK_HIGH   5
+  #define CTRL_BYTE_DELAY 18
+#else
   // Pic32...
   #include <pins_arduino.h>
   #define CTRL_CLK        5
   #define CTRL_CLK_HIGH   5
   #define CTRL_BYTE_DELAY 4
 #endif 
+#endif
 
 //These are our button constants
 #define PSB_SELECT      0x0001
@@ -209,6 +215,12 @@ class PS2X {
       uint8_t _dat_mask; 
       volatile uint8_t *_dat_ireg;
     #else
+    #ifdef ESP8266
+      int _clk_pin;
+      int _cmd_pin;
+      int _att_pin;
+      int _dat_pin;
+    #else
       uint8_t maskToBitNum(uint8_t);
       uint16_t _clk_mask; 
       volatile uint32_t *_clk_lport_set;
@@ -221,6 +233,7 @@ class PS2X {
       volatile uint32_t *_att_lport_clr;
       uint16_t _dat_mask; 
       volatile uint32_t *_dat_lport;
+    #endif
     #endif
 	
     unsigned long last_read;
