@@ -95,7 +95,7 @@ boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
    if(motor2 != 0x00)
       motor2 = map(motor2,0,255,0x40,0xFF); //noting below 40 will make it spin
 
-   char dword[9] = {0x01,0x42,0,motor1,motor2,0,0,0,0};
+   byte dword[9] = {0x01,0x42,0,motor1,motor2,0,0,0,0};
    byte dword2[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
    // Try a few times to get valid data...
@@ -134,7 +134,7 @@ boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
    }
 
 #ifdef PS2X_COM_DEBUG
-   Serial.println("OUT:IN");
+   Serial.print("OUT:IN ");
    for(int i=0; i<9; i++){
       Serial.print(dword[i], HEX);
       Serial.print(":");
@@ -230,10 +230,10 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
 
   //see if it talked - see if mode came back. 
   //If still anything but 41, 73 or 79, then it's not talking
-  if(PS2data[1] != 0x41 && PS2data[1] != 0x73 && PS2data[1] != 0x79){ 
+  if(PS2data[1] != 0x41 && PS2data[1] != 0x42 && PS2data[1] != 0x73 && PS2data[1] != 0x79){ 
 #ifdef PS2X_DEBUG
     Serial.println("Controller mode not matched or no controller found");
-    Serial.print("Expected 0x41, 0x73 or 0x79, but got ");
+    Serial.print("Expected 0x41, 0x42, 0x73 or 0x79, but got ");
     Serial.println(PS2data[1], HEX);
 #endif
     return 1; //return error code 1
@@ -282,7 +282,7 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
     if(y == 10){
 #ifdef PS2X_DEBUG
       Serial.println("Controller not accepting commands");
-      Serial.print("mode stil set at");
+      Serial.print("mode still set at");
       Serial.println(PS2data[1], HEX);
 #endif
       return 2; //exit function with error
@@ -351,10 +351,13 @@ byte PS2X::readType() {
 
   return 0;
 */
-
+  Serial.print("Controller_type: ");
+  Serial.println(controller_type, HEX);
   if(controller_type == 0x03)
     return 1;
-  else if(controller_type == 0x01)
+  else if(controller_type == 0x01 && PS2data[1] == 0x42)
+	return 4;
+  else if(controller_type == 0x01 && PS2data[1] != 0x42)
     return 2;
   else if(controller_type == 0x0C)  
     return 3;  //2.4G Wireless Dual Shock PS2 Game Controller
