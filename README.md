@@ -6,7 +6,7 @@ fork from： https://github.com/madsci1016/Arduino-PS2X
 
 之前的项目不支持 ESP32，本来打算用，折腾下ESP32，解决相关兼容问题。
 
-调整了下目录结构，直接克隆项目到 /arduino/libraries 目录下。
+调整了下目录结构，https://github.com/MyArduinoLib/Arduino-PS2X-ESP32 直接克隆项目到 /arduino/libraries 目录下。
 
 ```
 替换：
@@ -32,7 +32,7 @@ fork from： https://github.com/madsci1016/Arduino-PS2X
 
 使用ESP32 测试：
 
-https://github.com/MyArduinoLib/Arduino-PS2X-ESP32/blob/master/examples/PS2X_Example_ESP32/PS2X_Example.ino
+https://github.com/MyArduinoLib/Arduino-PS2X-ESP32/blob/master/examples/PS2X_Example_ESP32/PS2X_Example_ESP32.ino
 
 启动日志：
 
