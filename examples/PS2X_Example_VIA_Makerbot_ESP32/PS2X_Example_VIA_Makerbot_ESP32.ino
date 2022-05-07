@@ -1,13 +1,11 @@
-#include <PS2X_lib.h> //for v1.6
-
+#include <PS2X_lib.h>
 /******************************************************************
- * Cài đặt thư chân cho thư viện :
+ * Cài đặt chân cho thư viện :
  * - Trên mạch Motorshield của VIA Makerbot BANHMI, có header 6 chân
  *   được thiết kế để cắm tay cầm PS2.
  * Sơ đồ chân header và sơ đồ GPIO tương ứng:
  *   MOSI | MISO | GND | 3.3V | CS | CLK
  *    12     13    GND   3.3V   15   14
- *
  ******************************************************************/
 
 #define PS2_DAT 12 // MISO
@@ -19,129 +17,105 @@
  * Lựa chọn chế độ cho tay cầm PS2 :
  *   - pressures = đọc giá trị analog từ các nút bấm
  *   - rumble    = bật/tắt chế độ rung
- * uncomment 1 of the lines for each mode selection
  ******************************************************************/
 #define pressures false
 #define rumble false
 
-PS2X ps2x; // create PS2 Controller Class
-
-// right now, the library does NOT support hot pluggable controllers, meaning
-// you must always either restart your Arduino after you connect the controller,
-// or call config_gamepad(pins) again after connecting the controller.
-
-int error = -1;
-byte type = 0;
-byte vibrate = 0;
-int tryNum = 1;
+PS2X ps2x; // khởi tạo class PS2x
 
 void setup()
 {
-
-  // 115200
   Serial.begin(115200);
+  Serial.print("Ket noi voi tay cam PS2:");
 
-  // added delay to give wireless ps2 module some time to startup, before configuring it
-  // CHANGES for v1.6 HERE!!! **************PAY ATTENTION*************
-
-  while (error != 0)
+  int error = -1;
+  for (int i = 0; i < 10; i++) // thử kết nối với tay cầm ps2 trong 10 lần
   {
-    delay(1000); // 1 second wait
-    // setup pins and settings: GamePad(clock, command, attention, data, Pressures?, Rumble?) check for error
+    delay(1000); // đợi 1 giây
+    // cài đặt chân và các chế độ: GamePad(clock, command, attention, data, Pressures?, Rumble?) check for error
     error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
-    Serial.print("#try config ");
-    Serial.println(tryNum);
-    tryNum++;
+    Serial.print(".");
   }
 
-  Serial.println(ps2x.Analog(1), HEX);
-
-  type = ps2x.readType();
-  switch (type)
+  switch (error) // kiểm tra lỗi nếu sau 10 lần không kết nối được
   {
   case 0:
-    Serial.println(" Unknown Controller type found ");
+    Serial.println(" Ket noi tay cam PS2 thanh cong");
     break;
   case 1:
-    Serial.println(" DualShock Controller found ");
+    Serial.println(" LOI: Khong tim thay tay cam, hay kiem tra day ket noi vơi tay cam ");
     break;
   case 2:
-    Serial.println(" GuitarHero Controller found ");
+    Serial.println(" LOI: khong gui duoc lenh");
     break;
   case 3:
-    Serial.println(" Wireless Sony DualShock Controller found ");
+    Serial.println(" LOI: Khong vao duoc Pressures mode ");
     break;
   }
 }
 
 void loop()
 {
+  ps2x.read_gamepad(false, false); // gọi hàm để đọc tay điều khiển
 
-  if (type == 1)
-  {                                    // DualShock Controller
-    ps2x.read_gamepad(false, vibrate); // read controller and set large motor to spin at 'vibrate' speed
+  // các trả về giá trị TRUE (1) khi nút được giữ
+  if (ps2x.Button(PSB_START)) // nếu nút Start được giữ, in ra Serial monitor
+    Serial.println("Start is being held");
+  if (ps2x.Button(PSB_SELECT)) // nếu nút Select được giữ, in ra Serial monitor
+    Serial.println("Select is being held");
 
-    // will be TRUE as long as button is pressed
-    if (ps2x.Button(PSB_START))
-      Serial.println("Start is being held");
-    if (ps2x.Button(PSB_SELECT))
-      Serial.println("Select is being held");
+  if (ps2x.Button(PSB_PAD_UP)) // tương tự như trên kiểm tra nút Lên (PAD UP)
+  {
+    Serial.print("Up held this hard: ");
+    Serial.println(ps2x.Analog(PSAB_PAD_UP), DEC); // đọc giá trị analog ở nút này, xem nút này được bấm mạnh hay nhẹ
+  }
+  if (ps2x.Button(PSB_PAD_RIGHT))
+  {
+    Serial.print("Right held this hard: ");
+    Serial.println(ps2x.Analog(PSAB_PAD_RIGHT), DEC);
+  }
+  if (ps2x.Button(PSB_PAD_LEFT))
+  {
+    Serial.print("LEFT held this hard: ");
+    Serial.println(ps2x.Analog(PSAB_PAD_LEFT), DEC);
+  }
+  if (ps2x.Button(PSB_PAD_DOWN))
+  {
+    Serial.print("DOWN held this hard: ");
+    Serial.println(ps2x.Analog(PSAB_PAD_DOWN), DEC);
+  }
 
-    // will be TRUE as long as button is pressed
-    if (ps2x.Button(PSB_PAD_UP))
-    {
-      Serial.print("Up held this hard: ");
-      Serial.println(ps2x.Analog(PSAB_PAD_UP), DEC);
-    }
-    if (ps2x.Button(PSB_PAD_RIGHT))
-    {
-      Serial.print("Right held this hard: ");
-      Serial.println(ps2x.Analog(PSAB_PAD_RIGHT), DEC);
-    }
-    if (ps2x.Button(PSB_PAD_LEFT))
-    {
-      Serial.print("LEFT held this hard: ");
-      Serial.println(ps2x.Analog(PSAB_PAD_LEFT), DEC);
-    }
-    if (ps2x.Button(PSB_PAD_DOWN))
-    {
-      Serial.print("DOWN held this hard: ");
-      Serial.println(ps2x.Analog(PSAB_PAD_DOWN), DEC);
-    }
+  if (ps2x.NewButtonState())
+  { // Trả về giá trị TRUE khi nút được thay đổi trạng thái (bật sang tắt, or tắt sang bật)
+    if (ps2x.Button(PSB_L3))
+      Serial.println("L3 pressed");
+    if (ps2x.Button(PSB_R3))
+      Serial.println("R3 pressed");
+    if (ps2x.Button(PSB_L2))
+      Serial.println("L2 pressed");
+    if (ps2x.Button(PSB_R2))
+      Serial.println("R2 pressed");
+    if (ps2x.Button(PSB_TRIANGLE))
+      Serial.println("△ pressed");
+  }
+  //△□○×
+  if (ps2x.ButtonPressed(PSB_CIRCLE)) // Trả về giá trị TRUE khi nút được ấn (từ tắt sang bật)
+    Serial.println("○ just pressed");
+  if (ps2x.NewButtonState(PSB_CROSS)) // Trả về giá trị TRUE khi nút được thay đổi trạng thái
+    Serial.println("× just changed");
+  if (ps2x.ButtonReleased(PSB_SQUARE)) //  Trả về giá trị TRUE khi nút được ấn (từ tắt sang bật)
+    Serial.println("□ just released");
 
-    vibrate = ps2x.Analog(PSAB_CROSS); // this will set the large motor vibrate speed based on how hard you press the blue (X) button
-    if (ps2x.NewButtonState())
-    { // will be TRUE if any button changes state (on to off, or off to on)
-      if (ps2x.Button(PSB_L3))
-        Serial.println("L3 pressed");
-      if (ps2x.Button(PSB_R3))
-        Serial.println("R3 pressed");
-      if (ps2x.Button(PSB_L2))
-        Serial.println("L2 pressed");
-      if (ps2x.Button(PSB_R2))
-        Serial.println("R2 pressed");
-      if (ps2x.Button(PSB_TRIANGLE))
-        Serial.println("△ pressed");
-    }
-    //△□○×
-    if (ps2x.ButtonPressed(PSB_CIRCLE)) // will be TRUE if button was JUST pressed
-      Serial.println("○ just pressed");
-    if (ps2x.NewButtonState(PSB_CROSS)) // will be TRUE if button was JUST pressed OR released
-      Serial.println("× just changed");
-    if (ps2x.ButtonReleased(PSB_SQUARE)) // will be TRUE if button was JUST released
-      Serial.println("□ just released");
-
-    if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1))
-    { // print stick values if either is TRUE
-      Serial.print("Stick Values:");
-      Serial.print(ps2x.Analog(PSS_LY)); // Left stick, Y axis. Other options: LX, RY, RX
-      Serial.print(",");
-      Serial.print(ps2x.Analog(PSS_LX), DEC);
-      Serial.print(",");
-      Serial.print(ps2x.Analog(PSS_RY), DEC);
-      Serial.print(",");
-      Serial.println(ps2x.Analog(PSS_RX), DEC);
-    }
+  if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1)) // các trả về giá trị TRUE khi nút được giữ
+  {                                               // Đọc giá trị 2 joystick khi nút L1 hoặc R1 được giữ
+    Serial.print("Stick Values:");
+    Serial.print(ps2x.Analog(PSS_LY)); // đọc trục Y của joystick bên trái. Other options: LX, RY, RX
+    Serial.print(",");
+    Serial.print(ps2x.Analog(PSS_LX), DEC);
+    Serial.print(",");
+    Serial.print(ps2x.Analog(PSS_RY), DEC);
+    Serial.print(",");
+    Serial.println(ps2x.Analog(PSS_RX), DEC);
   }
   delay(50);
 }
