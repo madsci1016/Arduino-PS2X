@@ -24,7 +24,7 @@ Thư viện này là 1 bản sao thư viện tay cầm PS2 của 2 tác giả [m
   }
 ```
 
-Ví dụ chạy với mạch VIA Makerbot BANHMI：
+<!-- Ví dụ chạy với mạch VIA Makerbot BANHMI：
 
 https://github.com/MyArduinoLib/Arduino-PS2X-ESP32/blob/master/examples/PS2X_Example_ESP32/PS2X_Example_ESP32.ino
 
@@ -45,5 +45,5 @@ Thông tin hiện ra trên Serial monitor Khi chạy ví dụ trên：
 15:41:45.392 -> Stick Values:0,0,0,0
 15:41:45.459 -> × just changed
 15:41:45.459 -> □ just released
-```
+``` -->
 
