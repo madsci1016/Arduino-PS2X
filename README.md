@@ -1,21 +1,15 @@
-## NOTE
+## Giới thiệu
 
-fork from： https://github.com/madsci1016/Arduino-PS2X
+Thư viện tay cầm PS2 dành cho mạch VIA Makerbot ESP32
+Thư viện này giúp các bạn có thể sử dụng tay cầm PS2 cho mạch VIA Makerbot
 
-## PS2X 项目
+Thư viện này là 1 bản sao thư viện tay cầm PS2 của 2 tác giả [madsci1016](https://github.com/madsci1016/Arduino-PS2X) và [MyArduinoLib](https://github.com/MyArduinoLib/Arduino-PS2X-ESP32) được chỉnh sửa lại để sử dụng với mạch VIA Makerbot ESP32
 
-之前的项目不支持 ESP32，本来打算用，折腾下ESP32，解决相关兼容问题。
+## Sử dụng thư viện PSX2 với mạch Makerbot BANHMI
 
-调整了下目录结构，https://github.com/MyArduinoLib/Arduino-PS2X-ESP32 直接克隆项目到 /arduino/libraries 目录下。
 
-```
-替换：
-#ifdef ESP8266
-成：
-#if defined(ESP8266) || defined(ESP32)
-```
 
-## 修改 setup 函数
+## Khởi tạo thư viện:
 
 
 
@@ -30,11 +24,11 @@ fork from： https://github.com/madsci1016/Arduino-PS2X
   }
 ```
 
-使用ESP32 测试：
+Ví dụ chạy với mạch VIA Makerbot BANHMI：
 
 https://github.com/MyArduinoLib/Arduino-PS2X-ESP32/blob/master/examples/PS2X_Example_ESP32/PS2X_Example_ESP32.ino
 
-启动日志：
+Thông tin hiện ra trên Serial monitor Khi chạy ví dụ trên：
 
 ```
 15:41:44.363 -> #try config 1
@@ -52,3 +46,4 @@ https://github.com/MyArduinoLib/Arduino-PS2X-ESP32/blob/master/examples/PS2X_Exa
 15:41:45.459 -> × just changed
 15:41:45.459 -> □ just released
 ```
+
