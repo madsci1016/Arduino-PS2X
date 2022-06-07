@@ -53,6 +53,9 @@ Original code by Shutter on Arduino Forums. Later revamped and made into a libra
      - Reorganized directory so examples show up in Arduino IDE menu
  - 1.8
      - Added Arduino 1.0 compatibility.
+ - 1.9
+     - Kurt - Added detection and recovery from dropping from analog mode, plus
+     - integrated Chipkit (pic32mx...) support
 
 ## If you have problems
 
