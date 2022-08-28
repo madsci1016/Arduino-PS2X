@@ -56,7 +56,9 @@ byte PS2X::Analog(byte button) {
 
 /****************************************************************************************/
 unsigned char PS2X::_gamepad_shiftinout (char byte) {
-   unsigned char tmp = 0;
+  if(_spi == NULL) {
+    /* software SPI */
+    unsigned char tmp = 0;
    for(unsigned char i=0;i<8;i++) {
       if(CHK(byte,i)) CMD_SET();
       else CMD_CLR();
@@ -68,13 +70,16 @@ unsigned char PS2X::_gamepad_shiftinout (char byte) {
       if(DAT_CHK()) bitSet(tmp,i);
 
       CLK_SET();
-#if CTRL_CLK_HIGH
-      delayMicroseconds(CTRL_CLK_HIGH);
-#endif
+      delayMicroseconds(CTRL_CLK);
    }
    CMD_SET();
    delayMicroseconds(CTRL_BYTE_DELAY);
    return tmp;
+  } else {
+    unsigned char tmp = _spi->transfer(byte); // hardware SPI
+    delayMicroseconds(CTRL_BYTE_DELAY);
+    return tmp;
+  }
 }
 
 /****************************************************************************************/
@@ -100,11 +105,7 @@ boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
 
    // Try a few times to get valid data...
    for (byte RetryCnt = 0; RetryCnt < 5; RetryCnt++) {
-      CMD_SET();
-      CLK_SET();
-      ATT_CLR(); // low enable joystick
-
-      delayMicroseconds(CTRL_BYTE_DELAY);
+      BEGIN_SPI();
       //Send the command to send button and joystick data;
       for (int i = 0; i<9; i++) {
          PS2data[i] = _gamepad_shiftinout(dword[i]);
@@ -116,7 +117,7 @@ boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
          }
       }
 
-      ATT_SET(); // HI disable joystick
+      END_SPI();
       // Check to see if we received valid data or not.  
 	  // We should be in analog mode for our data to be valid (analog == 0x7_)
       if ((PS2data[1] & 0xf0) == 0x70)
@@ -168,61 +169,91 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat) {
 
 /****************************************************************************************/
 byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bool pressures, bool rumble) {
+#if defined(HAVE_PORTREG_IO)
+  _clk_mask = (port_mask_t) digitalPinToBitMask(clk);
+  _clk_oreg = (port_reg_t*) portOutputRegister(digitalPinToPort(clk));
+  _cmd_mask = (port_mask_t) digitalPinToBitMask(cmd);
+  _cmd_oreg = (port_reg_t*) portOutputRegister(digitalPinToPort(cmd));
+  _att_mask = (port_mask_t) digitalPinToBitMask(att);
+  _att_oreg = (port_reg_t*) portOutputRegister(digitalPinToPort(att));
+  _dat_mask = (port_mask_t) digitalPinToBitMask(dat);
+  _dat_ireg = (port_reg_t*) portInputRegister(digitalPinToPort(dat));
+#elif defined(HAVE_PORTREG_SC) // well it seems that this varies from platform to platform so...
+#if defined(__PIC32__)
+  uint32_t            lport;                   // Port number for this pin
+  _clk_mask = (port_mask_t) digitalPinToBitMask(clk);
+  lport = digitalPinToPort(clk);
+  _clk_lport_set = (port_reg_t*) portOutputRegister(lport) + 2;
+  _clk_lport_clr = (port_reg_t*) portOutputRegister(lport) + 1;
 
-  byte temp[sizeof(type_read)];
+  _cmd_mask = (port_mask_t) digitalPinToBitMask(cmd);
+  lport = digitalPinToPort(cmd);
+  _cmd_lport_set = (port_reg_t*) portOutputRegister(lport) + 2;
+  _cmd_lport_clr = (port_reg_t*) portOutputRegister(lport) + 1;
 
-#ifdef __AVR__
-  _clk_mask = digitalPinToBitMask(clk);
-  _clk_oreg = portOutputRegister(digitalPinToPort(clk));
-  _cmd_mask = digitalPinToBitMask(cmd);
-  _cmd_oreg = portOutputRegister(digitalPinToPort(cmd));
-  _att_mask = digitalPinToBitMask(att);
-  _att_oreg = portOutputRegister(digitalPinToPort(att));
-  _dat_mask = digitalPinToBitMask(dat);
-  _dat_ireg = portInputRegister(digitalPinToPort(dat));
+  _att_mask = (port_mask_t) digitalPinToBitMask(att);
+  lport = digitalPinToPort(att);
+  _att_lport_set = (port_reg_t*) portOutputRegister(lport) + 2;
+  _att_lport_clr = (port_reg_t*) portOutputRegister(lport) + 1;
+
+  _dat_mask = (port_mask_t) digitalPinToBitMask(dat);
+  _dat_lport = (port_reg_t*) portInputRegister(digitalPinToPort(dat));
+#endif
 #else
-#ifdef ESP8266
   _clk_pin = clk;
   _cmd_pin = cmd;
   _att_pin = att;
   _dat_pin = dat;
-#else
-  uint32_t            lport;                   // Port number for this pin
-  _clk_mask = digitalPinToBitMask(clk);
-  lport = digitalPinToPort(clk);
-  _clk_lport_set = portOutputRegister(lport) + 2;
-  _clk_lport_clr = portOutputRegister(lport) + 1;
-
-  _cmd_mask = digitalPinToBitMask(cmd);
-  lport = digitalPinToPort(cmd);
-  _cmd_lport_set = portOutputRegister(lport) + 2;
-  _cmd_lport_clr = portOutputRegister(lport) + 1;
-
-  _att_mask = digitalPinToBitMask(att);
-  lport = digitalPinToPort(att);
-  _att_lport_set = portOutputRegister(lport) + 2;
-  _att_lport_clr = portOutputRegister(lport) + 1;
-
-  _dat_mask = digitalPinToBitMask(dat);
-  _dat_lport = portInputRegister(digitalPinToPort(dat));
-#endif
 #endif
 
   pinMode(clk, OUTPUT); //configure ports
-  pinMode(att, OUTPUT);
+  pinMode(att, OUTPUT); ATT_SET();
   pinMode(cmd, OUTPUT);
-#ifdef ESP8266
   pinMode(dat, INPUT_PULLUP); // enable pull-up
-#else
-  pinMode(dat, INPUT);
-#endif
 
-#if defined(__AVR__)
-  digitalWrite(dat, HIGH); //enable pull-up
-#endif
-
-  CMD_SET(); // SET(*_cmd_oreg,_cmd_mask);
+  // CMD_SET(); // SET(*_cmd_oreg,_cmd_mask);
   CLK_SET();
+
+  return config_gamepad_stub(pressures, rumble);
+}
+
+byte PS2X::config_gamepad(SPIClass* spi, uint8_t att) {
+  return config_gamepad(spi, att, false, false);
+}
+
+byte PS2X::config_gamepad(SPIClass* spi, uint8_t att, bool pressures, bool rumble) {
+  _spi = spi;
+  #if defined(HAVE_PORTREG_IO)
+  _att_mask = (port_mask_t) digitalPinToBitMask(att);
+  _att_oreg = (port_reg_t*) portOutputRegister(digitalPinToPort(att));
+#elif defined(HAVE_PORTREG_SC) // well it seems that this varies from platform to platform so...
+#if defined(__PIC32__)
+  uint32_t            lport;                   // Port number for this pin
+  _att_mask = (port_mask_t) digitalPinToBitMask(att);
+  lport = digitalPinToPort(att);
+  _att_lport_set = (port_reg_t*) portOutputRegister(lport) + 2;
+  _att_lport_clr = (port_reg_t*) portOutputRegister(lport) + 1;
+#endif
+#else
+  _att_pin = att;
+#endif
+
+  pinMode(att, OUTPUT); ATT_SET();
+
+#if defined(SPI_HAS_TRANSACTION)
+  _spi_settings = SPISettings(CTRL_BITRATE, LSBFIRST, SPI_MODE2);
+#endif
+
+  /* some hardware SPI implementations incorrectly hold CLK low before the first transaction, so we'll try to fix that */
+  BEGIN_SPI_NOATT();
+  _spi->transfer(0x55); // anything will work here
+  END_SPI_NOATT();
+
+  return config_gamepad_stub(pressures, rumble);
+}
+
+byte PS2X::config_gamepad_stub(bool pressures, bool rumble) {
+  byte temp[sizeof(type_read)];
 
   //new error checking. First, read gamepad a few times to see if it's talking
   read_gamepad();
@@ -248,17 +279,14 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
     //read type
     delayMicroseconds(CTRL_BYTE_DELAY);
 
-    CMD_SET();
-    CLK_SET();
-    ATT_CLR(); // low enable joystick
-
-    delayMicroseconds(CTRL_BYTE_DELAY);
+    //CLK_SET(); // CLK should've been set to HIGH already
+    BEGIN_SPI();
 
     for (int i = 0; i<9; i++) {
       temp[i] = _gamepad_shiftinout(type_read[i]);
     }
 
-    ATT_SET(); // HI disable joystick
+    END_SPI();
 
     controller_type = temp[3];
 
@@ -296,13 +324,12 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
 void PS2X::sendCommandString(byte string[], byte len) {
 #ifdef PS2X_COM_DEBUG
   byte temp[len];
-  ATT_CLR(); // low enable joystick
-  delayMicroseconds(CTRL_BYTE_DELAY);
+  BEGIN_SPI();
 
   for (int y=0; y < len; y++)
     temp[y] = _gamepad_shiftinout(string[y]);
 
-  ATT_SET(); //high disable joystick
+  END_SPI();
   delay(read_delay); //wait a few
 
   Serial.println("OUT:IN Configure");
@@ -314,11 +341,10 @@ void PS2X::sendCommandString(byte string[], byte len) {
   }
   Serial.println("");
 #else
-  ATT_CLR(); // low enable joystick
-  delayMicroseconds(CTRL_BYTE_DELAY);
+  BEGIN_SPI();
   for (int y=0; y < len; y++)
     _gamepad_shiftinout(string[y]);
-  ATT_SET(); //high disable joystick
+  END_SPI();
   delay(read_delay);                  //wait a few
 #endif
 }
@@ -401,85 +427,78 @@ void PS2X::reconfig_gamepad(){
 }
 
 /****************************************************************************************/
-#ifdef __AVR__
+#if defined(HAVE_PORTREG_IO)
 inline void  PS2X::CLK_SET(void) {
+#if defined(__AVR__) // there should be a platform-independent way to do this
   register uint8_t old_sreg = SREG;
   cli();
+#endif
   *_clk_oreg |= _clk_mask;
+#if defined(__AVR__)
   SREG = old_sreg;
+#endif
 }
 
 inline void  PS2X::CLK_CLR(void) {
+#if defined(__AVR__)
   register uint8_t old_sreg = SREG;
   cli();
+#endif
   *_clk_oreg &= ~_clk_mask;
+#if defined(__AVR__)
   SREG = old_sreg;
+#endif
 }
 
 inline void  PS2X::CMD_SET(void) {
+#if defined(__AVR__)
   register uint8_t old_sreg = SREG;
   cli();
+#endif
   *_cmd_oreg |= _cmd_mask; // SET(*_cmd_oreg,_cmd_mask);
+#if defined(__AVR__)
   SREG = old_sreg;
+#endif
 }
 
 inline void  PS2X::CMD_CLR(void) {
+#if defined(__AVR__)
   register uint8_t old_sreg = SREG;
   cli();
+#endif
   *_cmd_oreg &= ~_cmd_mask; // SET(*_cmd_oreg,_cmd_mask);
+#if defined(__AVR__)
   SREG = old_sreg;
+#endif
 }
 
 inline void  PS2X::ATT_SET(void) {
+#if defined(__AVR__)
   register uint8_t old_sreg = SREG;
   cli();
+#endif
   *_att_oreg |= _att_mask ;
+#if defined(__AVR__)
   SREG = old_sreg;
+#endif
 }
 
 inline void PS2X::ATT_CLR(void) {
+#if defined(__AVR__)
   register uint8_t old_sreg = SREG;
   cli();
+#endif
   *_att_oreg &= ~_att_mask;
+#if defined(__AVR__)
   SREG = old_sreg;
+#endif
 }
 
 inline bool PS2X::DAT_CHK(void) {
   return (*_dat_ireg & _dat_mask) ? true : false;
 }
 
-#else
-#ifdef ESP8266
-// Let's just use digitalWrite() on ESP8266.
-inline void  PS2X::CLK_SET(void) {
-  digitalWrite(_clk_pin, HIGH);
-}
-
-inline void  PS2X::CLK_CLR(void) {
-  digitalWrite(_clk_pin, LOW);
-}
-
-inline void  PS2X::CMD_SET(void) {
-  digitalWrite(_cmd_pin, HIGH);
-}
-
-inline void  PS2X::CMD_CLR(void) {
-  digitalWrite(_cmd_pin, LOW);
-}
-
-inline void  PS2X::ATT_SET(void) {
-  digitalWrite(_att_pin, HIGH);
-}
-
-inline void PS2X::ATT_CLR(void) {
-  digitalWrite(_att_pin, LOW);
-}
-
-inline bool PS2X::DAT_CHK(void) {
-  return digitalRead(_dat_pin) ? true : false;
-}
-#else
-// On pic32, use the set/clr registers to make them atomic...
+#elif defined(HAVE_PORTREG_SC)
 inline void  PS2X::CLK_SET(void) {
   *_clk_lport_set |= _clk_mask;
 }
@@ -507,6 +526,80 @@ inline void PS2X::ATT_CLR(void) {
 inline bool PS2X::DAT_CHK(void) {
   return (*_dat_lport & _dat_mask) ? true : false;
 }
+#else
+inline void  PS2X::CLK_SET(void) {
+  digitalWrite(_clk_pin, HIGH);
+}
+
+inline void  PS2X::CLK_CLR(void) {
+  digitalWrite(_clk_pin, LOW);
+}
+
+inline void  PS2X::CMD_SET(void) {
+  digitalWrite(_cmd_pin, HIGH);
+}
+
+inline void  PS2X::CMD_CLR(void) {
+  digitalWrite(_cmd_pin, LOW);
+}
+
+inline void  PS2X::ATT_SET(void) {
+  digitalWrite(_att_pin, HIGH);
+}
+
+inline void PS2X::ATT_CLR(void) {
+  digitalWrite(_att_pin, LOW);
+}
+
+inline bool PS2X::DAT_CHK(void) {
+  return digitalRead(_dat_pin) ? true : false;
+}
 
 #endif
+
+inline void PS2X::BEGIN_SPI_NOATT(void) {
+  if(_spi != NULL) {
+#if defined(SPI_HAS_TRANSACTION)
+    _spi->beginTransaction(_spi_settings);
+#else
+    // _spi->begin();
+    _spi->setBitOrder(LSBFIRST);
+    _spi->setDataMode(SPI_MODE2);
+#if defined(__AVR__)
+    _spi->setClockDivider(CTRL_DIVIDER);
+#elif defined(__SAM3X8E__)
+    _spi->setClockDivider(F_CPU / CTRL_BITRATE);
+#else
+    #error Unsupported method of setting clock divider without transaction, please update this library to support this platform, update the platform code to support SPI transaction, or use software SPI.
 #endif
+#endif
+  } else {
+    CMD_CLR();
+    CLK_SET();
+  }
+}
+
+inline void PS2X::BEGIN_SPI(void) {
+  BEGIN_SPI_NOATT();
+  ATT_CLR(); // low enable joystick
+  delayMicroseconds(CTRL_BYTE_DELAY);
+}
+
+inline void PS2X::END_SPI_NOATT(void) {
+  if(_spi != NULL) {
+#if defined(SPI_HAS_TRANSACTION)
+    _spi->endTransaction();
+#else
+    // _spi->end();
+#endif
+  } else {
+    CMD_CLR();
+    CLK_SET();
+  }
+}
+
+inline void PS2X::END_SPI(void) {
+  ATT_SET();
+  END_SPI_NOATT();
+  delayMicroseconds(CTRL_BYTE_DELAY);
+}

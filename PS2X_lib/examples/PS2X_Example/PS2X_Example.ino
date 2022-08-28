@@ -1,15 +1,17 @@
 #include <PS2X_lib.h>  //for v1.6
+#include <SPI.h> // for hardware SPI support
 
 /******************************************************************
  * set pins connected to PS2 controller:
  *   - 1e column: original 
  *   - 2e colmun: Stef?
+ *   - 3e column: itsmevjnk (for ESP32 HSPI)
  * replace pin numbers by the ones you use
  ******************************************************************/
-#define PS2_DAT        13  //14    
-#define PS2_CMD        11  //15
-#define PS2_SEL        10  //16
-#define PS2_CLK        12  //17
+#define PS2_DAT        13  //14  12
+#define PS2_CMD        11  //15  13
+#define PS2_SEL        10  //16  15
+#define PS2_CLK        12  //17  14
 
 /******************************************************************
  * select modes of PS2 controller:
@@ -35,41 +37,57 @@ byte vibrate = 0;
 void setup(){
  
   Serial.begin(57600);
-  
-  delay(300);  //added delay to give wireless ps2 module some time to startup, before configuring it
-   
-  //CHANGES for v1.6 HERE!!! **************PAY ATTENTION*************
-  
-  //setup pins and settings: GamePad(clock, command, attention, data, Pressures?, Rumble?) check for error
-  error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
-  
-  if(error == 0){
-    Serial.print("Found Controller, configured successful ");
-    Serial.print("pressures = ");
-	if (pressures)
-	  Serial.println("true ");
-	else
-	  Serial.println("false");
-	Serial.print("rumble = ");
-	if (rumble)
-	  Serial.println("true)");
-	else
-	  Serial.println("false");
+
+  /* support more flexible waiting times for wireless PS2 module to start up */
+  unsigned long t_start = millis();
+  Serial.println("Initializing PS2 controller.");
+  while(1) {
+    error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble); // software SPI initialization
+    /* For hardware SPI, use these commands instead:
+      *  SPI.begin(); // needed for SPI initialization
+      *  error = ps2x.config_gamepad(&SPI, PS2_SEL, pressures, rumble);
+      * Please note that the above command MAY NOT work on platforms with multiple SPI buses (such as ESP32).
+      * For reference, this is how to use the ESP32's HSPI bus on its default pins (for VSPI the above commands will suffice, and more detailed example is available on Espressif's SPI bus example: https://github.com/espressif/arduino-esp32/blob/master/libraries/SPI/examples/SPI_Multiple_Buses/SPI_Multiple_Buses.ino)
+      *  SPIClass* hspi = new SPIClass(HSPI);
+      *  hspi->begin();
+      *  error = ps2x.config_gamepad(hspi, PS2_SEL, pressures, rumble);
+      * Additionally, pressures and rumble can be omitted from config_gamepad(), indicating that we will not be using those functions.
+      */
+    
+    if(error == 0){
+      Serial.print("Found Controller, configured successful after ");
+      Serial.print(millis() - t_start, DEC);
+      Serial.print("ms (pressures = ");
+    if (pressures)
+      Serial.print("true");
+    else
+      Serial.print("false");
+    Serial.print(", rumble = ");
+    if (rumble)
+      Serial.println("true)");
+    else
+      Serial.println("false");
     Serial.println("Try out all the buttons, X will vibrate the controller, faster as you press harder;");
     Serial.println("holding L1 or R1 will print out the analog stick values.");
     Serial.println("Note: Go to www.billporter.info for updates and to report bugs.");
-  }  
-  else if(error == 1)
-    Serial.println("No controller found, check wiring, see readme.txt to enable debug. visit www.billporter.info for troubleshooting tips");
-   
-  else if(error == 2)
-    Serial.println("Controller found but not accepting commands. see readme.txt to enable debug. Visit www.billporter.info for troubleshooting tips");
+    break;
+    }  
+    else if(error == 1) {
+      Serial.println("No controller found, check wiring, see readme.txt to enable debug. visit www.billporter.info for troubleshooting tips");
+      continue;
+    }
+    
+    else if(error == 2) {
+      Serial.println("Controller found but not accepting commands. see readme.txt to enable debug. Visit www.billporter.info for troubleshooting tips");
+      continue;
+    }
 
-  else if(error == 3)
-    Serial.println("Controller refusing to enter Pressures mode, may not support it. ");
-  
-//  Serial.print(ps2x.Analog(1), HEX);
-  
+    else if(error == 3) {
+      Serial.println("Controller refusing to enter Pressures mode, may not support it. ");
+      break; // non-fatal error
+    }
+  }
+
   type = ps2x.readType(); 
   switch(type) {
     case 0:
@@ -81,10 +99,10 @@ void setup(){
     case 2:
       Serial.print("GuitarHero Controller found ");
       break;
-	case 3:
+	  case 3:
       Serial.print("Wireless Sony DualShock Controller found ");
       break;
-   }
+  }
 }
 
 void loop() {
