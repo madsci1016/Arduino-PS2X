@@ -214,11 +214,28 @@ class PS2X {
     boolean  read_gamepad(boolean, byte);
     byte readType();
     /* config_gamepad for software SPI */
-    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t);
-    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool);
+    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t); // specify pins, pressure and rumble disabled
+    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool); // specify pins AND pressure&rumble mode
     /* config_gamepad for hardware SPI */
-    byte config_gamepad(SPIClass*, uint8_t);
-    byte config_gamepad(SPIClass*, uint8_t, bool, bool);
+    byte config_gamepad(SPIClass*, uint8_t); // specify SPIClass and ATT pin, begins SPI by itself
+    byte config_gamepad(SPIClass*, uint8_t, bool); // specify SPIClass and ATT pin, as well as whether to begin SPI
+    byte config_gamepad(SPIClass*, uint8_t, bool, bool); // specify SPIClass, ATT pin and pressure&rumble mode, begins SPI by itself
+    byte config_gamepad(SPIClass*, uint8_t, bool, bool, bool); // specify SPIClass, ATT pin, pressure&rumble mode, and whether to begin SPI
+    // ready-to-use config functions for select boards (right now only supports Arduino with default SPI port and ESP32 HSPI and VSPI)
+    byte config_gamepad_arduino_spi(uint8_t); // specify ATT pin. please note that using this on ESP32 is functionally similar to config_gamepad_esp32_vspi(uint8_t)
+    byte config_gamepad_arduino_spi(uint8_t, bool, bool); // specify ATT pin and pressure&rumble mode. please note that using this on ESP32 is functionally similar to config_gamepad_esp32_vspi(uint8_t, bool, bool)
+#if defined(ESP32)
+    // HSPI
+    byte config_gamepad_esp32_hspi(uint8_t); // use HSPI with custom ATT pin
+    byte config_gamepad_esp32_hspi(uint8_t, bool, bool); // use HSPI with custom ATT pin, also specify whether to enable pressure and rumble
+    byte config_gamepad_esp32_hspi(uint8_t, uint8_t, uint8_t, uint8_t); // use HSPI with custom pins
+    byte config_gamepad_esp32_hspi(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool); // use HSPI with custom pins, also specify whether to enable pressure and rumble
+    // VSPI
+    byte config_gamepad_esp32_vspi(uint8_t); // use VSPI with custom ATT pin
+    byte config_gamepad_esp32_vspi(uint8_t, bool, bool); // use VSPI with custom ATT pin, also specify whether to enable pressure and rumble
+    byte config_gamepad_esp32_vspi(uint8_t, uint8_t, uint8_t, uint8_t); // use VSPI with custom pins
+    byte config_gamepad_esp32_vspi(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool); // use VSPI with custom pins, also specify whether to enable pressure and rumble
+#endif
     void enableRumble();
     bool enablePressures();
     byte Analog(byte);

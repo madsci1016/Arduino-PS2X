@@ -218,10 +218,18 @@ byte PS2X::config_gamepad(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bo
 }
 
 byte PS2X::config_gamepad(SPIClass* spi, uint8_t att) {
-  return config_gamepad(spi, att, false, false);
+  return config_gamepad(spi, att, false, false, true);
+}
+
+byte PS2X::config_gamepad(SPIClass* spi, uint8_t att, bool begin) {
+  return config_gamepad(spi, att, false, false, begin);
 }
 
 byte PS2X::config_gamepad(SPIClass* spi, uint8_t att, bool pressures, bool rumble) {
+  return config_gamepad(spi, att, pressures, rumble, true);
+}
+
+byte PS2X::config_gamepad(SPIClass* spi, uint8_t att, bool pressures, bool rumble, bool begin) {
   _spi = spi;
   #if defined(HAVE_PORTREG_IO)
   _att_mask = (port_mask_t) digitalPinToBitMask(att);
@@ -243,6 +251,8 @@ byte PS2X::config_gamepad(SPIClass* spi, uint8_t att, bool pressures, bool rumbl
 #if defined(SPI_HAS_TRANSACTION)
   _spi_settings = SPISettings(CTRL_BITRATE, LSBFIRST, SPI_MODE2);
 #endif
+
+  if(begin) _spi->begin(); // begin SPI with default settings
 
   /* some hardware SPI implementations incorrectly hold CLK low before the first transaction, so we'll try to fix that */
   BEGIN_SPI_NOATT();
@@ -603,3 +613,50 @@ inline void PS2X::END_SPI(void) {
   END_SPI_NOATT();
   delayMicroseconds(CTRL_BYTE_DELAY);
 }
+
+/****************************************************************************************/
+byte PS2X::config_gamepad_arduino_spi(uint8_t att) {
+  return config_gamepad_arduino_spi(att, false, false);
+}
+
+byte PS2X::config_gamepad_arduino_spi(uint8_t att, bool pressures, bool rumble) {
+  return config_gamepad(&SPI, att, pressures, rumble);
+}
+
+#if defined(ESP32)
+byte PS2X::config_gamepad_esp32_hspi(uint8_t att) {
+  return config_gamepad_esp32_hspi(att, false, false);
+}
+
+byte PS2X::config_gamepad_esp32_hspi(uint8_t att, bool pressures, bool rumble) {
+  return config_gamepad(new SPIClass(HSPI), att, pressures, rumble);
+}
+
+byte PS2X::config_gamepad_esp32_hspi(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat) {
+  return config_gamepad_esp32_hspi(clk, cmd, att, dat, false, false);
+}
+
+byte PS2X::config_gamepad_esp32_hspi(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bool pressures, bool rumble) {
+  SPIClass* spi_class = new SPIClass(HSPI);
+  spi_class->begin(clk, dat, cmd, att);
+  return config_gamepad(spi_class, att, pressures, rumble, false);
+}
+
+byte PS2X::config_gamepad_esp32_vspi(uint8_t att) {
+  return config_gamepad_esp32_vspi(att, false, false);
+}
+
+byte PS2X::config_gamepad_esp32_vspi(uint8_t att, bool pressures, bool rumble) {
+  return config_gamepad(new SPIClass(VSPI), att, pressures, rumble);
+}
+
+byte PS2X::config_gamepad_esp32_vspi(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat) {
+  return config_gamepad_esp32_vspi(clk, cmd, att, dat, false, false);
+}
+
+byte PS2X::config_gamepad_esp32_vspi(uint8_t clk, uint8_t cmd, uint8_t att, uint8_t dat, bool pressures, bool rumble) {
+  SPIClass* spi_class = new SPIClass(VSPI);
+  spi_class->begin(clk, dat, cmd, att);
+  return config_gamepad(spi_class, att, pressures, rumble, false);
+}
+#endif

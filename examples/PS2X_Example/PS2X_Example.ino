@@ -42,17 +42,35 @@ void setup(){
   unsigned long t_start = millis();
   Serial.println("Initializing PS2 controller.");
   while(1) {
+    /* 
+     * There are multiple ways to initialize the gamepad, which can be categorized into three levels:
+     * Level 1: Beginner
+     *  The gamepad can be initialized using these ready-to-use functions, which make use of the platform's hardware SPI bus:
+     *   error = ps2x.config_gamepad_arduino_spi(PS2_SEL); // please note that unless specified with the pressures and rumble arguments, these features will not be used
+     *   error = ps2x.config_gamepad_arduino_spi(PS2_SEL, pressures, rumble);
+     *  A few other functions are available exclusively for the ESP32 to make use of its HSPI and VSPI buses (the examples shown below are for HSPI, to use VSPI just change hspi to vspi):
+     *   error = ps2x.config_gamepad_esp32_hspi(PS2_SEL);
+     *   error = ps2x.config_gamepad_esp32_hspi(PS2_SEL, pressures, rumble);
+     *   error = ps2x.config_gamepad_esp32_hspi(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT); // this and the below function use ESP32's SPI pin routing features so that connection is not just limited to the designated pins
+     *   error = ps2x.config_gamepad_esp32_hspi(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble);
+     *  If hardware SPI is not available, this library also provides a software (bitbanged) SPI solution. To use it, use one of these functions:
+     *   error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT);
+     *   error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble); // used below
+     * Level 2: Intermediate
+     *  Alternatively, if you choose to use a custom SPI class (e.g. software SPI library), or you want to tinker with pointers, these functions are available:
+     *   error = ps2x.config_gamepad(&SPI, PS2_SEL);
+     *   error = ps2x.config_gamepad(&SPI, PS2_SEL, pressures, rumble);
+     *  If you're using something other than the default SPI bus, make sure that you replace &SPI with a pointer (SPIClass*) pointing to the SPI class of your choice.
+     *  Please note that the above functions automatically initialize the SPI class using its begin() function. If you are looking for functions that don't do so, check out Level 3.
+     *  NOTE: On ESP32, the default SPI class refers to the VSPI bus. If you're using HSPI, you have to change &SPI to `new SPIClass(HSPI)` (without the backticks).
+     * Level 3: Advanced
+     *  Some SPI class implementations (e.g. ESP32) allows for custom configuration in their begin() function (e.g. pin routing). If you wish to be in control of this configuration, use one of these instead:
+     *   error = ps2x.config_gamepad(&SPI, PS2_SEL, false);
+     *   error = ps2x.config_gamepad(&SPI, PS2_SEL, pressures, rumble, false);
+     *  Note the `false` argument at the end.
+     *  You MUST run the SPI class' begin() function (e.g. SPI.begin() in the above example) prior to running the functions above, otherwise initialization will fail.
+     */
     error = ps2x.config_gamepad(PS2_CLK, PS2_CMD, PS2_SEL, PS2_DAT, pressures, rumble); // software SPI initialization
-    /* For hardware SPI, use these commands instead:
-      *  SPI.begin(); // needed for SPI initialization
-      *  error = ps2x.config_gamepad(&SPI, PS2_SEL, pressures, rumble);
-      * Please note that the above command MAY NOT work on platforms with multiple SPI buses (such as ESP32).
-      * For reference, this is how to use the ESP32's HSPI bus on its default pins (for VSPI the above commands will suffice, and more detailed example is available on Espressif's SPI bus example: https://github.com/espressif/arduino-esp32/blob/master/libraries/SPI/examples/SPI_Multiple_Buses/SPI_Multiple_Buses.ino)
-      *  SPIClass* hspi = new SPIClass(HSPI);
-      *  hspi->begin();
-      *  error = ps2x.config_gamepad(hspi, PS2_SEL, pressures, rumble);
-      * Additionally, pressures and rumble can be omitted from config_gamepad(), indicating that we will not be using those functions.
-      */
     
     if(error == 0){
       Serial.print("Found Controller, configured successful after ");
