@@ -283,6 +283,7 @@ byte PS2X::config_gamepad_stub(bool pressures, bool rumble) {
   //try setting mode, increasing delays if need be.
   read_delay = 1;
 
+  t_last_att = millis() + CTRL_PACKET_DELAY; // start reading right away
   for(int y = 0; y <= 10; y++) {
     sendCommandString(enter_config, sizeof(enter_config)); //start config run
 
@@ -591,6 +592,7 @@ inline void PS2X::BEGIN_SPI_NOATT(void) {
 
 inline void PS2X::BEGIN_SPI(void) {
   BEGIN_SPI_NOATT();
+  while(millis() - t_last_att < CTRL_PACKET_DELAY);
   ATT_CLR(); // low enable joystick
   delayMicroseconds(CTRL_BYTE_DELAY);
 }
@@ -611,7 +613,7 @@ inline void PS2X::END_SPI_NOATT(void) {
 inline void PS2X::END_SPI(void) {
   ATT_SET();
   END_SPI_NOATT();
-  delayMicroseconds(CTRL_BYTE_DELAY);
+  t_last_att = millis();
 }
 
 /****************************************************************************************/

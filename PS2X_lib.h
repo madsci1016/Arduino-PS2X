@@ -92,13 +92,14 @@ GNU General Public License for more details.
 #include <SPI.h>
 
 /* SPI timing configuration */
-#define CTRL_BITRATE        50000UL // SPI bitrate (Hz). Please note that on AVR Arduinos, the lowest bitrate possible is 125kHz.
+#define CTRL_BITRATE        250000UL // SPI bitrate (Hz). Please note that on AVR Arduinos, the lowest bitrate possible is 125kHz.
 #if (1000000UL / (2 * CTRL_BITRATE) > 0)
 #define CTRL_CLK      (1000000UL / (2 * CTRL_BITRATE)) // delay duration between SCK high and low
 #else
 #define CTRL_CLK      1
 #endif
-#define CTRL_BYTE_DELAY     20 // delay duration between byte reads
+#define CTRL_BYTE_DELAY     10 // delay duration between byte reads (uS)
+#define CTRL_PACKET_DELAY   16 // delay duration between packets (mS) - according to playstation.txt this should be set to 16mS, but it seems that it can go down to 4mS without problems
 #if !defined(SPI_HAS_TRANSACTION) && defined(__AVR__)
 // SPI divider for AVR
 #if (F_CPU / CTRL_BITRATE < 3)
@@ -127,7 +128,7 @@ typedef uint8_t port_mask_t;
 typedef volatile RwReg port_reg_t;
 typedef uint32_t port_mask_t;
 #define HAVE_PORTREG_IO
-#elif defined(__PIC32__) // TODO: is this how we're supposed to detect ESP32?
+#elif defined(__PIC32__) // TODO: is this how we're supposed to detect PIC32?
 typedef volatile uint32_t port_reg_t;
 typedef uint16_t port_mask_t;
 #define HAVE_PORTREG_SC
@@ -298,6 +299,8 @@ class PS2X {
     #if defined(SPI_HAS_TRANSACTION)
       SPISettings _spi_settings; // hardware SPI transaction settings
     #endif
+
+    volatile unsigned long t_last_att; // time since last ATT inactive
 	
     unsigned long last_read;
     byte read_delay;
