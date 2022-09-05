@@ -137,6 +137,7 @@ typedef uint16_t port_mask_t;
 typedef volatile uint32_t port_reg_t;
 typedef uint32_t port_mask_t;
 #define HAVE_PORTREG_IO
+
 #endif
 
 //These are our button constants
@@ -237,6 +238,7 @@ class PS2X {
     byte config_gamepad_esp32_vspi(uint8_t, uint8_t, uint8_t, uint8_t); // use VSPI with custom pins
     byte config_gamepad_esp32_vspi(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool); // use VSPI with custom pins, also specify whether to enable pressure and rumble
 #endif
+
     void enableRumble();
     bool enablePressures();
     byte Analog(byte);
@@ -258,6 +260,7 @@ class PS2X {
     inline void END_SPI(void);
     
     byte config_gamepad_stub(bool, bool); // common gamepad initialization sequence
+
     unsigned char _gamepad_shiftinout (char);
     unsigned char PS2data[21];
     void sendCommandString(byte*, byte);
@@ -288,6 +291,7 @@ class PS2X {
       port_mask_t _dat_mask; 
       port_reg_t *_dat_lport;
     #else // platform does not have port registers (eg. ESP8266, ESP32)
+
       int _clk_pin;
       int _cmd_pin;
       int _att_pin;
@@ -301,6 +305,7 @@ class PS2X {
     #endif
 
     volatile unsigned long t_last_att; // time since last ATT inactive
+
 	
     unsigned long last_read;
     byte read_delay;

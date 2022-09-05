@@ -59,6 +59,7 @@ unsigned char PS2X::_gamepad_shiftinout (char byte) {
   if(_spi == NULL) {
     /* software SPI */
     unsigned char tmp = 0;
+
    for(unsigned char i=0;i<8;i++) {
       if(CHK(byte,i)) CMD_SET();
       else CMD_CLR();
@@ -71,6 +72,7 @@ unsigned char PS2X::_gamepad_shiftinout (char byte) {
 
       CLK_SET();
       delayMicroseconds(CTRL_CLK);
+
    }
    CMD_SET();
    delayMicroseconds(CTRL_BYTE_DELAY);
@@ -80,6 +82,7 @@ unsigned char PS2X::_gamepad_shiftinout (char byte) {
     delayMicroseconds(CTRL_BYTE_DELAY);
     return tmp;
   }
+
 }
 
 /****************************************************************************************/
@@ -118,6 +121,7 @@ boolean PS2X::read_gamepad(boolean motor1, byte motor2) {
       }
 
       END_SPI();
+
       // Check to see if we received valid data or not.  
 	  // We should be in analog mode for our data to be valid (analog == 0x7_)
       if ((PS2data[1] & 0xf0) == 0x70)
@@ -265,6 +269,7 @@ byte PS2X::config_gamepad(SPIClass* spi, uint8_t att, bool pressures, bool rumbl
 byte PS2X::config_gamepad_stub(bool pressures, bool rumble) {
   byte temp[sizeof(type_read)];
 
+
   //new error checking. First, read gamepad a few times to see if it's talking
   read_gamepad();
   read_gamepad();
@@ -284,6 +289,7 @@ byte PS2X::config_gamepad_stub(bool pressures, bool rumble) {
   read_delay = 1;
 
   t_last_att = millis() + CTRL_PACKET_DELAY; // start reading right away
+
   for(int y = 0; y <= 10; y++) {
     sendCommandString(enter_config, sizeof(enter_config)); //start config run
 
@@ -293,11 +299,13 @@ byte PS2X::config_gamepad_stub(bool pressures, bool rumble) {
     //CLK_SET(); // CLK should've been set to HIGH already
     BEGIN_SPI();
 
+
     for (int i = 0; i<9; i++) {
       temp[i] = _gamepad_shiftinout(type_read[i]);
     }
 
     END_SPI();
+
 
     controller_type = temp[3];
 
@@ -341,6 +349,7 @@ void PS2X::sendCommandString(byte string[], byte len) {
     temp[y] = _gamepad_shiftinout(string[y]);
 
   END_SPI();
+
   delay(read_delay); //wait a few
 
   Serial.println("OUT:IN Configure");
@@ -356,6 +365,7 @@ void PS2X::sendCommandString(byte string[], byte len) {
   for (int y=0; y < len; y++)
     _gamepad_shiftinout(string[y]);
   END_SPI();
+
   delay(read_delay);                  //wait a few
 #endif
 }
@@ -503,6 +513,7 @@ inline void PS2X::ATT_CLR(void) {
 #if defined(__AVR__)
   SREG = old_sreg;
 #endif
+
 }
 
 inline bool PS2X::DAT_CHK(void) {
@@ -662,3 +673,4 @@ byte PS2X::config_gamepad_esp32_vspi(uint8_t clk, uint8_t cmd, uint8_t att, uint
   return config_gamepad(spi_class, att, pressures, rumble, false);
 }
 #endif
+
