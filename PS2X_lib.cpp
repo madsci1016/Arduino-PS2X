@@ -253,7 +253,7 @@ byte PS2X::config_gamepad(SPIClass* spi, uint8_t att, bool pressures, bool rumbl
   pinMode(att, OUTPUT); ATT_SET();
 
 #if defined(SPI_HAS_TRANSACTION)
-  _spi_settings = SPISettings(CTRL_BITRATE, LSBFIRST, SPI_MODE2);
+  _spi_settings = SPISettings(CTRL_BITRATE, LSBFIRST, SPI_MODE0);
 #endif
 
   if(begin) _spi->begin(); // begin SPI with default settings
