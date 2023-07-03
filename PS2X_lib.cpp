@@ -636,7 +636,10 @@ byte PS2X::config_gamepad_arduino_spi(uint8_t att, bool pressures, bool rumble) 
   return config_gamepad(&SPI, att, pressures, rumble);
 }
 
-#if defined(ESP32)
+#if CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3
+#define VSPI FSPI
+#endif
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3
 byte PS2X::config_gamepad_esp32_hspi(uint8_t att) {
   return config_gamepad_esp32_hspi(att, false, false);
 }
