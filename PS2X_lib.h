@@ -89,23 +89,55 @@ GNU General Public License for more details.
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
-#ifdef __AVR__
-  // AVR
-  #include <avr/io.h>
-  #define CTRL_CLK        4
-  #define CTRL_BYTE_DELAY 3
+#include <SPI.h>
+
+/* SPI timing configuration */
+#define CTRL_BITRATE        250000UL // SPI bitrate (Hz). Please note that on AVR Arduinos, the lowest bitrate possible is 125kHz.
+#if (1000000UL / (2 * CTRL_BITRATE) > 0)
+#define CTRL_CLK      (1000000UL / (2 * CTRL_BITRATE)) // delay duration between SCK high and low
 #else
-#ifdef ESP8266
-  #define CTRL_CLK        5
-  #define CTRL_CLK_HIGH   5
-  #define CTRL_BYTE_DELAY 18
+#define CTRL_CLK      1
+#endif
+#define CTRL_BYTE_DELAY     10 // delay duration between byte reads (uS)
+#define CTRL_PACKET_DELAY   16 // delay duration between packets (mS) - according to playstation.txt this should be set to 16mS, but it seems that it can go down to 4mS without problems
+#if !defined(SPI_HAS_TRANSACTION) && defined(__AVR__)
+// SPI divider for AVR
+#if (F_CPU / CTRL_BITRATE < 3)
+#define CTRL_DIVIDER    SPI_CLOCK_DIV2
+#elif (F_CPU / CTRL_BITRATE < 6)
+#define CTRL_DIVIDER    SPI_CLOCK_DIV4
+#elif (F_CPU / CTRL_BITRATE < 12)
+#define CTRL_DIVIDER    SPI_CLOCK_DIV8
+#elif (F_CPU / CTRL_BITRATE < 24)
+#define CTRL_DIVIDER    SPI_CLOCK_DIV16
+#elif (F_CPU / CTRL_BITRATE < 48)
+#define CTRL_DIVIDER    SPI_CLOCK_DIV32
+#elif (F_CPU / CTRL_BITRATE < 96)
+#define CTRL_DIVIDER    SPI_CLOCK_DIV64
 #else
-  // Pic32...
-  #include <pins_arduino.h>
-  #define CTRL_CLK        5
-  #define CTRL_CLK_HIGH   5
-  #define CTRL_BYTE_DELAY 4
-#endif 
+#define CTRL_DIVIDER    SPI_CLOCK_DIV128
+#endif
+#endif
+
+/* port register data types */
+#if defined(__AVR__)
+typedef volatile uint8_t port_reg_t;
+typedef uint8_t port_mask_t;
+#define HAVE_PORTREG_IO
+#elif defined(__SAM3X8E__)
+typedef volatile RwReg port_reg_t;
+typedef uint32_t port_mask_t;
+#define HAVE_PORTREG_IO
+#elif defined(__PIC32__) // TODO: is this how we're supposed to detect PIC32?
+typedef volatile uint32_t port_reg_t;
+typedef uint16_t port_mask_t;
+#define HAVE_PORTREG_SC
+#elif (defined(__arm__) || defined(ARDUINO_FEATHER52)) &&                      \
+    !defined(ARDUINO_ARCH_MBED) && !defined(ARDUINO_ARCH_RP2040)
+typedef volatile uint32_t port_reg_t;
+typedef uint32_t port_mask_t;
+#define HAVE_PORTREG_IO
+
 #endif
 
 //These are our button constants
@@ -183,8 +215,30 @@ class PS2X {
     void read_gamepad();
     boolean  read_gamepad(boolean, byte);
     byte readType();
-    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t);
-    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool);
+    /* config_gamepad for software SPI */
+    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t); // specify pins, pressure and rumble disabled
+    byte config_gamepad(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool); // specify pins AND pressure&rumble mode
+    /* config_gamepad for hardware SPI */
+    byte config_gamepad(SPIClass*, uint8_t); // specify SPIClass and ATT pin, begins SPI by itself
+    byte config_gamepad(SPIClass*, uint8_t, bool); // specify SPIClass and ATT pin, as well as whether to begin SPI
+    byte config_gamepad(SPIClass*, uint8_t, bool, bool); // specify SPIClass, ATT pin and pressure&rumble mode, begins SPI by itself
+    byte config_gamepad(SPIClass*, uint8_t, bool, bool, bool); // specify SPIClass, ATT pin, pressure&rumble mode, and whether to begin SPI
+    // ready-to-use config functions for select boards (right now only supports Arduino with default SPI port and ESP32 HSPI and VSPI)
+    byte config_gamepad_arduino_spi(uint8_t); // specify ATT pin. please note that using this on ESP32 is functionally similar to config_gamepad_esp32_vspi(uint8_t)
+    byte config_gamepad_arduino_spi(uint8_t, bool, bool); // specify ATT pin and pressure&rumble mode. please note that using this on ESP32 is functionally similar to config_gamepad_esp32_vspi(uint8_t, bool, bool)
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3
+    // HSPI
+    byte config_gamepad_esp32_hspi(uint8_t); // use HSPI with custom ATT pin
+    byte config_gamepad_esp32_hspi(uint8_t, bool, bool); // use HSPI with custom ATT pin, also specify whether to enable pressure and rumble
+    byte config_gamepad_esp32_hspi(uint8_t, uint8_t, uint8_t, uint8_t); // use HSPI with custom pins
+    byte config_gamepad_esp32_hspi(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool); // use HSPI with custom pins, also specify whether to enable pressure and rumble
+    // VSPI
+    byte config_gamepad_esp32_vspi(uint8_t); // use VSPI with custom ATT pin
+    byte config_gamepad_esp32_vspi(uint8_t, bool, bool); // use VSPI with custom ATT pin, also specify whether to enable pressure and rumble
+    byte config_gamepad_esp32_vspi(uint8_t, uint8_t, uint8_t, uint8_t); // use VSPI with custom pins
+    byte config_gamepad_esp32_vspi(uint8_t, uint8_t, uint8_t, uint8_t, bool, bool); // use VSPI with custom pins, also specify whether to enable pressure and rumble
+#endif
+
     void enableRumble();
     bool enablePressures();
     byte Analog(byte);
@@ -198,45 +252,60 @@ class PS2X {
     inline void ATT_SET(void);
     inline void ATT_CLR(void);
     inline bool DAT_CHK(void);
+
+    inline void BEGIN_SPI_NOATT(void);
+    inline void END_SPI_NOATT(void);
+
+    inline void BEGIN_SPI(void);
+    inline void END_SPI(void);
     
+    byte config_gamepad_stub(bool, bool); // common gamepad initialization sequence
+
     unsigned char _gamepad_shiftinout (char);
     unsigned char PS2data[21];
     void sendCommandString(byte*, byte);
     unsigned char i;
     unsigned int last_buttons;
     unsigned int buttons;
-	
-    #ifdef __AVR__
-      uint8_t maskToBitNum(uint8_t);
-      uint8_t _clk_mask; 
-      volatile uint8_t *_clk_oreg;
-      uint8_t _cmd_mask; 
-      volatile uint8_t *_cmd_oreg;
-      uint8_t _att_mask; 
-      volatile uint8_t *_att_oreg;
-      uint8_t _dat_mask; 
-      volatile uint8_t *_dat_ireg;
-    #else
-    #ifdef ESP8266
+
+    /* pin I/O configuration, mostly relevant to software SPI support (except ATT which is used in both software and hardware SPI) */
+    #if defined(HAVE_PORTREG_IO) // platform has port registers in input/output configuration (eg. AVR, STM32)
+      port_mask_t _clk_mask; 
+      port_reg_t *_clk_oreg;
+      port_mask_t _cmd_mask; 
+      port_reg_t *_cmd_oreg;
+      port_mask_t _att_mask; 
+      port_reg_t *_att_oreg;
+      port_mask_t _dat_mask; 
+      port_reg_t *_dat_ireg;
+    #elif defined(HAVE_PORTREG_SC) // platform has port registers in set/clear configuration (eg. PIC32)
+      port_mask_t _clk_mask; 
+      port_reg_t *_clk_lport_set;
+      port_reg_t *_clk_lport_clr;
+      port_mask_t _cmd_mask; 
+      port_reg_t *_cmd_lport_set;
+      port_reg_t *_cmd_lport_clr;
+      port_mask_t _att_mask; 
+      port_reg_t *_att_lport_set;
+      port_reg_t *_att_lport_clr;
+      port_mask_t _dat_mask; 
+      port_reg_t *_dat_lport;
+#else // platform does not have port registers (eg. ESP8266, ESP32, ESP32C3, ESP32S3)
+
       int _clk_pin;
       int _cmd_pin;
       int _att_pin;
       int _dat_pin;
-    #else
-      uint8_t maskToBitNum(uint8_t);
-      uint16_t _clk_mask; 
-      volatile uint32_t *_clk_lport_set;
-      volatile uint32_t *_clk_lport_clr;
-      uint16_t _cmd_mask; 
-      volatile uint32_t *_cmd_lport_set;
-      volatile uint32_t *_cmd_lport_clr;
-      uint16_t _att_mask; 
-      volatile uint32_t *_att_lport_set;
-      volatile uint32_t *_att_lport_clr;
-      uint16_t _dat_mask; 
-      volatile uint32_t *_dat_lport;
     #endif
+
+    /* SPI configuration */
+    SPIClass* _spi; // hardware SPI class (null = software SPI)
+    #if defined(SPI_HAS_TRANSACTION)
+      SPISettings _spi_settings; // hardware SPI transaction settings
     #endif
+
+    volatile unsigned long t_last_att; // time since last ATT inactive
+
 	
     unsigned long last_read;
     byte read_delay;
