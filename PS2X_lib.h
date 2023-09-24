@@ -226,7 +226,7 @@ class PS2X {
     // ready-to-use config functions for select boards (right now only supports Arduino with default SPI port and ESP32 HSPI and VSPI)
     byte config_gamepad_arduino_spi(uint8_t); // specify ATT pin. please note that using this on ESP32 is functionally similar to config_gamepad_esp32_vspi(uint8_t)
     byte config_gamepad_arduino_spi(uint8_t, bool, bool); // specify ATT pin and pressure&rumble mode. please note that using this on ESP32 is functionally similar to config_gamepad_esp32_vspi(uint8_t, bool, bool)
-#if defined(ESP32)
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32S3
     // HSPI
     byte config_gamepad_esp32_hspi(uint8_t); // use HSPI with custom ATT pin
     byte config_gamepad_esp32_hspi(uint8_t, bool, bool); // use HSPI with custom ATT pin, also specify whether to enable pressure and rumble
@@ -290,7 +290,7 @@ class PS2X {
       port_reg_t *_att_lport_clr;
       port_mask_t _dat_mask; 
       port_reg_t *_dat_lport;
-    #else // platform does not have port registers (eg. ESP8266, ESP32)
+#else // platform does not have port registers (eg. ESP8266, ESP32, ESP32C3, ESP32S3)
 
       int _clk_pin;
       int _cmd_pin;
